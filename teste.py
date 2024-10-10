@@ -8,7 +8,7 @@ import folium
 from folium.plugins import MarkerCluster
 
 # URLs e caminhos de arquivos
-shp_mg_url = 'https://github.com/RaulShinobu/rainweb_new/edit/main/MG_Mesorregioes_2022/MG_Mesorregioes_2022.shp'
+shp_mg_url = 'https://github.com/RaulShinobu/rainweb_new/edit/main/MG_Mesorregioes_2022/sul_de_minas.geojson'
 csv_file_path = 'input;/lista_das_estacoes_CEMADEN_13maio2024.csv'
 
 # Login e senha do CEMADEN (previamente fornecidos)
