@@ -9,7 +9,8 @@ import glob
 from folium.plugins import MarkerCluster
 
 # URLs e caminhos de arquivos
-shp_mg_url = 'https://github.com/giuliano-macedo/geodata-br-states/raw/main/geojson/br_states/br_mg.json'
+#shp_mg_url = 'https://github.com/giuliano-macedo/geodata-br-states/raw/main/geojson/br_states/br_mg.json'
+shp_sul_minas = 'https://github.com/RaulShinobu/rainweb_new/edit/main/MG_Mesorregioes_2022/MG_Mesorregioes_2022.shp'
 csv_file_path = 'input;/lista_das_estacoes_CEMADEN_13maio2024.csv'
 
 # Login e senha do CEMADEN (previamente fornecidos)
@@ -17,14 +18,17 @@ login = 'augustoflaviobob@gmail.com'
 senha = 'Flaviobr123!'
 
 # Carregar os dados do shapefile de Minas Gerais
-mg_gdf = gpd.read_file(shp_mg_url)
+sul_minas = gpd.read_file(shp_sul_minas)
+#mg_gdf = gpd.read_file(shp_mg_url)
 
 # Carregar os dados das estações
 df = pd.read_csv(csv_file_path)
 gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['Longitude'], df['Latitude']))
 
 # Realizar o filtro espacial: apenas estações dentro de Minas Gerais
-gdf_mg = gpd.sjoin(gdf, mg_gdf, predicate='within')
+# Filtrar apenas as estações dentro do Sul de Minas
+gdf_sul_mg = gpd.sjoin(gdf, sul_mg_gdf, predicate='within')
+#gdf_mg = gpd.sjoin(gdf, mg_gdf, predicate='within')
 
 # Recuperação do token
 token_url = 'http://sgaa.cemaden.gov.br/SGAA/rest/controle-token/tokens'
@@ -82,10 +86,10 @@ def main():
         unsafe_allow_html=True
     )
 
-    m = leafmap.Map(center=[-19.00, -44.38], zoom=7, draw_control=False, measure_control=False, fullscreen_control=False, attribution_control=True)
+    m = leafmap.Map(center=[-21.00, -45.00], zoom=7, draw_control=False, measure_control=False, fullscreen_control=False, attribution_control=True)
 
     # Adicionar marcadores das estações meteorológicas
-    for i, row in gdf_mg.iterrows():
+    for i, row in gdf_sul_mg.iterrows():
         # Baixar dados da estação
         codigo_estacao = row['Código']
         dados_estacao= baixar_dados_estacao(codigo_estacao, 'MG', data_inicial, data_final, login, senha)
@@ -113,7 +117,7 @@ def main():
         ).add_to(m)
 
     m.add_gdf(
-        mg_gdf, 
+        gdf_sul_mg, 
         layer_name="Minas Gerais", 
         style={"color": "black", "weight": 1, "fillOpacity": 0, "interactive": False},
         info_mode=None
