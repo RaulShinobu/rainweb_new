@@ -27,7 +27,7 @@ gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['Longitude'], df['Lati
 
 # Realizar o filtro espacial: apenas estações dentro de Minas Gerais
 # Filtrar apenas as estações dentro do Sul de Minas
-gdf_sul_mg = gpd.sjoin(gdf, sul_mg_gdf, predicate='within')
+gdf_sul_mg = gpd.sjoin(gdf, sul_minas, predicate='within')
 #gdf_mg = gpd.sjoin(gdf, mg_gdf, predicate='within')
 
 # Recuperação do token
