@@ -18,7 +18,8 @@ login = 'augustoflaviobob@gmail.com'
 senha = 'Flaviobr123!'
 
 # Carregar os dados do shapefile de Minas Gerais
-sul_minas = gpd.read_file(shp_sul_minas)
+sul_mg = gpd.read_file(shp_sul_minas)
+sul_minas = sul_mg[sul_mg['NM_MESO']=='Sul/Sudoeste de Minas']
 #mg_gdf = gpd.read_file(shp_mg_url)
 
 # Carregar os dados das estações
