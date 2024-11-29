@@ -28,11 +28,13 @@ senha = 'gLs24@ImgBR!'
 mg_gdf = gpd.read_file(shp_mg_url)
 
 # Estações selecionadas no Sul de Minas Gerais
-codigo_estacao = [
-    '314790701A', '310710901A', '312870901A', '315180001A',
-    '316930701A', '314780801A', '315250101A', '313240401A',
-    '313360001A', '311410501A', '316230201A', '313300601A'
-]
+# codigo_estacao = [
+#     '314790701A', '310710901A', '312870901A', '315180001A',
+#     '316930701A', '314780801A', '315250101A', '313240401A',
+#     '313360001A', '311410501A', '316230201A', '313300601A'
+# ]
+
+ codigo_estacao = ['314790701A']
 
 # Carregar os dados das estações meteorológicas
 try:
