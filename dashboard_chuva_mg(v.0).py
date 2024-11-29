@@ -21,8 +21,8 @@ shp_mg_url = 'https://github.com/giuliano-macedo/geodata-br-states/raw/main/geoj
 csv_file_path = 'input/estacoes_filtradas.csv'
 
 # Credenciais para login no CEMADEN
-login = 'augustoflaviobob@gmail.com'
-senha = 'Flaviobr123!'
+login = 'd2020028915@unifei.edu.br'
+senha = 'gLs24@ImgBR!'
 
 # Carregar o shapefile de Minas Gerais
 mg_gdf = gpd.read_file(shp_mg_url)
@@ -37,7 +37,7 @@ codigo_estacao = [
 # Carregar os dados das estações meteorológicas
 try:
     df1 = pd.read_csv(csv_file_path)
-    gdf = gpd.GeoDataFrame(df1, geometry=gpd.points_from_xy(df1['longitude'], df1['latitude']))
+    gdf = gpd.GeoDataFrame(df1, geometry=gpd.points_from_xy(df1['Longitude'], df1['Latitude']))
 except FileNotFoundError:
     st.error("Arquivo de estações não encontrado. Verifique o caminho e tente novamente.")
     st.stop()
@@ -114,7 +114,7 @@ st.header("Monitoramento de Chuva - Sul de Minas Gerais")
 m = leafmap.Map(center=[-21, -45], zoom_start=8)
 for _, row in gdf_mg.iterrows():
     folium.Marker(
-        location=[row['latitude'], row['longitude']],
+        location=[row['Latitude'], row['Longitude']],
         popup=f"{row['municipio']} - Código: {row['codEstacao']}",
         icon=folium.Icon(color="green")
     ).add_to(m)
