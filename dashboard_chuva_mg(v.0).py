@@ -6,64 +6,81 @@ import numpy as np
 from datetime import datetime, timedelta
 import leafmap.foliumap as leafmap
 import folium
-import glob
+import calendar
+from io import StringIO
 import matplotlib.pyplot as plt
 from folium.plugins import MarkerCluster
 
-# Simulação de dados (soma de chuva em mm) - substitua por seus dados reais
-chuva_ultima_hora = np.random.uniform(0, 5)  # Exemplo de valor entre 0 e 5mm
-chuva_ultimas_24_horas = np.random.uniform(5, 50)  # Exemplo de valor entre 5 e 50mm
-chuva_ultimas_48_horas = np.random.uniform(20, 100)  # Exemplo de valor entre 20 e 100mm
+# Simulação de dados de chuva acumulada (substitua por dados reais)
+chuva_ultima_hora = np.random.uniform(0, 5)  # Valor entre 0 e 5mm
+chuva_ultimas_24_horas = np.random.uniform(5, 50)  # Valor entre 5 e 50mm
+chuva_ultimas_48_horas = np.random.uniform(20, 100)  # Valor entre 20 e 100mm
 
 # URLs e caminhos de arquivos
 shp_mg_url = 'https://github.com/giuliano-macedo/geodata-br-states/raw/main/geojson/br_states/br_mg.json'
-csv_file_path = 'input;/data(2).csv'
+csv_file_path = 'input/estacoes_filtradas.csv'
 
-# Login e senha do CEMADEN (previamente fornecidos)
+# Credenciais para login no CEMADEN
 login = 'augustoflaviobob@gmail.com'
 senha = 'Flaviobr123!'
 
-# Carregar os dados do shapefile de Minas Gerais
+# Carregar o shapefile de Minas Gerais
 mg_gdf = gpd.read_file(shp_mg_url)
 
-# Estações Selecionadas do Sul de Minas Gerais
-codigo_estacao = ['314790701A','310710901A','312870901A','315180001A','316930701A','314780801A','315250101A','313240401A','313360001A','311410501A','316230201A','313300601A']
+# Estações selecionadas no Sul de Minas Gerais
+codigo_estacao = [
+    '314790701A', '310710901A', '312870901A', '315180001A',
+    '316930701A', '314780801A', '315250101A', '313240401A',
+    '313360001A', '311410501A', '316230201A', '313300601A'
+]
 
-# Carregar os dados das estações
-df = pd.read_csv(csv_file_path)
-gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['Longitude'], df['Latitude']))
+# Carregar os dados das estações meteorológicas
+try:
+    df1 = pd.read_csv(csv_file_path)
+    gdf = gpd.GeoDataFrame(df1, geometry=gpd.points_from_xy(df1['longitude'], df1['latitude']))
+except FileNotFoundError:
+    st.error("Arquivo de estações não encontrado. Verifique o caminho e tente novamente.")
+    st.stop()
 
-# Realizar o filtro espacial: apenas estações dentro de Minas Gerais
+# Filtrar estações dentro de Minas Gerais
 gdf_mg = gpd.sjoin(gdf, mg_gdf, predicate='within')
 
-# Recuperação do token
-token_url = 'http://sgaa.cemaden.gov.br/SGAA/rest/controle-token/tokens'
-login_payload = {'email': login, 'password': senha}
-response = requests.post(token_url, json=login_payload)
-content = response.json()
-token = content['token']
-
-# Obter os valores de precipitação da estação selecionada
-dados_chuva = df['valorMedida']
-chuva_ultima_hora = dados_chuva[0]
-chuva_24h = dados_chuva[0]
-chuva_48h = dados_chuva[0]
-
-estacao_selecionada =  gdf_mg['codEstacao'].unique()
+# Função para baixar dados das estações
+def baixar_dados_estacoes(codigo_estacao, data_inicial, data_final, sigla_estado):
+    dados_estacoes = {}
+    for codigo in codigo_estacao:
+        dados_completos = []
+        for data_mes in pd.date_range(data_inicial, data_final, freq='1M'):
+            ano_mes = data_mes.strftime('%Y%m')
+            sws_url = 'http://sws.cemaden.gov.br/PED/rest/pcds/dados_pcd'
+            params = dict(
+                rede=11, uf=sigla_estado, inicio=ano_mes, fim=ano_mes, codigo=codigo
+            )
+            r = requests.get(sws_url, params=params, headers={'token': token})
+            if r.status_code == 200:
+                dados = r.text
+                linhas = dados.split("\n")[1:]  # Remove o cabeçalho
+                if linhas:
+                    df = pd.read_csv(StringIO("\n".join(linhas)), sep=";")
+                    df['datahora'] = pd.to_datetime(df['datahora'])
+                    df.set_index('datahora', inplace=True)
+                    dados_completos.append(df[df['sensor'] == 'chuva'])
+        if dados_completos:
+            dados_estacoes[codigo] = pd.concat(dados_completos)
+    return dados_estacoes
 
 # Função para exibir gráficos de precipitação
 def mostrar_graficos():
     horas = ['Última Hora', '24 Horas', '48 Horas']
-    chuva_valores = [chuva_ultima_hora, chuva_24h, chuva_48h]
-    
-    fig, ax = plt.subplots()
-    ax.bar(horas, chuva_valores, color=['blue', 'orange', 'green'])
+    valores = [chuva_ultima_hora, chuva_ultimas_24_horas, chuva_ultimas_48_horas]
+    fig, ax = plt.subplots(figsize=(5, 3))
+    ax.bar(horas, valores, color=['blue', 'orange', 'green'])
     ax.set_ylabel('Precipitação (mm)')
     ax.set_title('Precipitação nas últimas horas')
-    
     st.pyplot(fig)
-# Função para exibir o pop-up no canto inferior direito
-def exibir_popup(chuva_ultima_hora, chuva_ultimas_24_horas, chuva_ultimas_48_horas):
+
+# Exibir popup com informações de chuva
+def exibir_popup():
     st.markdown("""
     <style>
         .popup {
@@ -80,109 +97,34 @@ def exibir_popup(chuva_ultima_hora, chuva_ultimas_24_horas, chuva_ultimas_48_hor
         }
     </style>
     """, unsafe_allow_html=True)
-
-    # Conteúdo do popup
     st.markdown(f"""
     <div class="popup">
         <h4>Informações de Chuva</h4>
-        <p>Chuva na última hora: {chuva_ultima_hora} mm</p>
-        <p>Chuva nas últimas 24 horas: {chuva_ultimas_24_horas} mm</p>
-        <p>Chuva nas últimas 48 horas: {chuva_ultimas_48_horas} mm</p>
+        <p>Última hora: {chuva_ultima_hora:.2f} mm</p>
+        <p>Últimas 24 horas: {chuva_ultimas_24_horas:.2f} mm</p>
+        <p>Últimas 48 horas: {chuva_ultimas_48_horas:.2f} mm</p>
     </div>
     """, unsafe_allow_html=True)
 
-# Função para baixar os dados do último mês e retornar a soma
-def baixar_dados_estacao(codigo_estacao, sigla_estado, data_inicial, data_final, login, senha):
-    dfs = []
-    for estacao in codigo_estacao: 
-        for ano_mes_dia in pd.date_range(data_inicial, data_final, freq='1M'):
-            ano_mes = ano_mes_dia.strftime('%Y%m')
-            sws_url = 'http://sws.cemaden.gov.br/PED/rest/pcds/df_pcd'
-            params = dict(rede=11, uf=sigla_estado, inicio=ano_mes, fim=ano_mes, codigo=codigo_estacao)
-            r = requests.get(sws_url, params=params, headers={'token': token})
-            df_mes = pd.read_csv(pd.compat.StringIO(r.text))
-            df.append(df_mes)
-                
-        files = sorted(glob.glob(f'/content/estacao_CEMADEN_{sigla_estado}_{codigo_estacao}*.csv'))
-    
-        # leitura dos arquivos
-        df = pd.DataFrame()
-        for file in files:
-        
-            # leitura da tabela
-            df0 = pd.read_csv(file, delimiter=';', skiprows=1)
-        
-            # junta a tabela que foi lida com a anterior
-            df = pd.concat([df, df0], ignore_index=True)
-    
-        # insere a coluna data como DateTime no DataFrame
-        #df['datahora'] = pd.to_datetime(df['datahora'])
-        
-        # seta a coluna data com o index do dataframe
-        #df.set_index('datahora', inplace=True)
-    
-        # seleciona o acumulado de vhuva
-        #dfs = df[df['sensor'] == 'chuva']
-        
-    #soma_selecionada = df['valor'].sum()
+# Configuração da página no Streamlit
+st.set_page_config(layout="wide")
 
-# Função principal do dashboard
-def main():
-    hoje = datetime.now()
-    data_inicial = hoje.replace(day=1)
-    data_final = hoje
+# Mostrar o mapa com as estações meteorológicas
+st.header("Monitoramento de Chuva - Sul de Minas Gerais")
+m = leafmap.Map(center=[-21, -45], zoom_start=8)
+for _, row in gdf_mg.iterrows():
+    folium.Marker(
+        location=[row['latitude'], row['longitude']],
+        popup=f"{row['municipio']} - Código: {row['codEstacao']}",
+        icon=folium.Icon(color="green")
+    ).add_to(m)
+m.to_streamlit(width=900, height=500)
 
-    m = leafmap.Map(center=[-21.5, -45.75],zoom=6,height="400px", width="800px",draw_control=False, measure_control=False, fullscreen_control=False, attribution_control=True)
+# Exibição de filtros e gráficos
+st.sidebar.header("Filtros")
+mostrar_grafico = st.sidebar.checkbox("Mostrar Gráfico de Precipitação")
+if mostrar_grafico:
+    mostrar_graficos()
 
-        
-    # Adicionar marcadores das estações meteorológicas
-    for i, row in gdf_mg.iterrows():
-        # Baixar dados da estação
-        codigo_estacao = row['codEstacao']
-        dados_estacao= baixar_dados_estacao(codigo_estacao, 'MG', data_inicial, data_final, login, senha)
-        
-    
-    st.sidebar.header("Filtros de Seleção")
-    modo_selecao = st.sidebar.radio("Selecionar Estação por:", ('Código'))
-    
-    if modo_selecao == 'Código':
-        estacao_selecionada = st.sidebar.selectbox("Selecione a Estação", gdf_mg['codEstacao'].unique())
-        codigo_estacao = gdf_mg[gdf_mg['codEstacao'] == estacao_selecionada]['codEstacao'].values[0]
-
-    sigla_estado = 'MG'
-    tipo_busca = st.sidebar.radio("Tipo de Busca:", ('Diária', 'Mensal'))
-
-    if tipo_busca == 'Diária':
-        data_inicial = st.sidebar.date_input("Data", value=data_inicial)
-    else:
-        ano_selecionado = st.sidebar.selectbox("Selecione o Ano", range(2020, datetime.now().year + 1))
-        mes_selecionado = st.sidebar.selectbox("Selecione o Mês", range(1, 13))
-        data_inicial = datetime(ano_selecionado, mes_selecionado, 1)
-        data_final = datetime(ano_selecionado, mes_selecionado + 1, 1) - timedelta(days=1) if mes_selecionado != 12 else datetime(ano_selecionado, 12, 31)
-
-    if st.sidebar.button("Baixar Dados"):
-        data_inicial_str = data_inicial.strftime('%Y%m%d')
-        data_final_str = data_final.strftime('%Y%m%d')
-        dados_estacao= baixar_dados_estacao(codigo_estacao, sigla_estado, data_inicial, data_final, login, senha)
-
-        if not dados_estacao.empty:
-            st.subheader(f"Dados da Estação: {estacao_selecionada} (Código: {codigo_estacao})")
-            st.write(dados_estacao)
-        else:
-            st.warning("Nenhum dado encontrado para o período selecionado.")
-        
-    # Checkbox na barra lateral para alternar exibição do gráfico
-    mostrar = st.sidebar.checkbox("Gráfico de Precipitação")
-
-    # Exibir ou ocultar o gráfico conforme o estado do checkbox
-    if mostrar:
-        mostrar_graficos()
-        
-    # Mostrar o mapa em Streamlit
-    m.to_streamlit()
-    # Chamando a função para exibir o popup
-    exibir_popup(chuva_ultima_hora, chuva_ultimas_24_horas, chuva_ultimas_48_horas)
-
-    
-if __name__ == "__main__":
-    main()
+# Exibir popup de chuva
+exibir_popup()
